@@ -134,20 +134,20 @@ const Header = () => {
         {/* LOGO */}
         <Link
           href="/"
-          className="text-2xl font-bold uppercase tracking-wider text-white"
+          className="text-2xl font-bold uppercase tracking-wider text-white hover:text-primary transition-all duration-300"
         >
           GameHub
         </Link>
 
         {/* DESKTOP NAV */}
-        <nav className="hidden md:flex gap-8 text-sm font-medium text-white/80">
-          <Link href="/games" className="hover:text-white transition">
+        <nav className="hidden md:flex gap-8 text-sm font-medium text-white/80 ">
+          <Link href="/games" className="hover:text-primary transition-all duration-300">
             Games
           </Link>
-          <Link href="/genres" className="hover:text-white transition">
+          <Link href="/genres" className="hover:text-primary transition-  all duration-300">
             Genres
           </Link>
-          <Link href="/new" className="hover:text-white transition">
+          <Link href="/new" className="hover:text-primary transition-all duration-300">
             New Releases
           </Link>
         </nav>
@@ -155,14 +155,14 @@ const Header = () => {
         {/* SEARCH BAR CONTAINER */}
         <div ref={searchContainerRef} className="relative hidden md:block w-72">
           <div className="relative flex items-center">
-            <Search className="absolute left-3 w-4 h-4 text-white/50" />
+            <Search className="absolute left-3 w-4 h-4 text-white/50 " />
             <Input
               value={search}
               placeholder="Search games..."
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={handleEnter}
               onFocus={() => search && setOpen(true)}
-              className="bg-white/5 border-white/10 text-white pl-9 focus-visible:ring-white/20"
+              className="bg-white/5 border-white/10 text-white pl-9  "
             />
             {search && (
               <button

@@ -66,9 +66,9 @@ export default async function GamePage({
   const game = await getGame(id);
 
   if (!game) return notFound();
-
+  console.log(game);
   return (
-    <div className="min-h-screen bg-zinc-950 text-white pb-20">
+    <div className="min-h-screen bg-black text-white pb-20 ">
       <div className="relative h-[80vh] w-full">
         {game.background_image ? (
           <Image

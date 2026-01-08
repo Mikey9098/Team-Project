@@ -4,7 +4,7 @@ import RecentAddedGames from "./components/recentAddedGames";
 const page = () => {
   return (
     <>
-      <GameCarousel />
+      {/* <GameCarousel /> */}
       <Menu />
       <RecentAddedGames />
     </>

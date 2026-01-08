@@ -10,7 +10,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { ArrowRight } from "lucide-react";
+import { motion, useMotionTemplate, useMotionValue } from "motion/react";
 
 type Genre = {
   id: number;
@@ -34,74 +34,57 @@ const Menu: React.FC = () => {
 
     fetchGenres();
   }, []);
-  return (
-    <div className="w-full h-100 bg-black  p-14">
-      <div className="flex justify-between items-center">
-        <h1 className="text-white text-2xl font-bold mb-8">Genres</h1>
 
-        <Link
-          href="/genres"
-          className="
-      text-white text-2xl font-bold mb-8
-      flex items-center gap-2
-      transition-all duration-500
-      hover:text-white/80
-      group
-    "
-        >
-          All Genres
-          <ArrowRight className="transition-transform group-hover:translate-x-1" />
-        </Link>
+  return (
+    <div className="relative w-full min-h-125 bg-black p-14 pt-20 overflow-hidden">
+      <div className="relative z-10 flex justify-between items-center">
+        <h1 className="text-white text-3xl font-bold mb-10 tracking-tight">
+          Genres
+        </h1>
       </div>
 
-      <Carousel opts={{ align: "start", loop: true }} className="w-full">
-        <CarouselContent>
+      <Carousel
+        opts={{ align: "start", loop: true }}
+        className="relative z-10 w-full"
+      >
+        <CarouselContent className="-ml-4">
           {genres.map((genre) => (
             <CarouselItem
               key={genre.id}
-              className="
-                basis-1/1
-                sm:basis-1/2
-                md:basis-1/3
-                lg:basis-1/4
-              "
+              className="pl-4 basis-full sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
             >
               <Link href={`/genre/${genre.slug}`}>
-                <div
-                  className="
-    group
-    rounded-xs overflow-hidden
-    border border-white/10
-    text-white`
-    transition-all duration-500
-    hover:border-white
-      "
-                >
-                  <div className="relative h-45">
+                <div className="group relative rounded-lg overflow-hidden border border-white/10 bg-zinc-900/50 transition-all duration-500 hover:border-white/40">
+                  <div className="relative h-48 overflow-hidden">
                     <Image
                       src={genre.image_background}
                       alt={genre.name}
                       fill
-                      className="group-hover:border-white group-hover:scale-110 object-cover  transition-all duration-500 border-border border-b"
+                      sizes="(max-width: 768px) 100vw, 25vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
                     />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                   </div>
 
-                  <div className="bg-black px-5 py-4">
-                    <h2 className="text-xl font-semibold text-white">
+                  <div className="relative p-5">
+                    <h2 className="text-xl font-bold text-white group-hover:text-purple-400 transition-colors">
                       {genre.name}
                     </h2>
-                    <p className="text-sm text-white/60 uppercase">
-                      {genre.games_count} games
+                    <p className="text-xs text-white/50 uppercase tracking-widest mt-1">
+                      {genre.games_count.toLocaleString()} games
                     </p>
                   </div>
                 </div>
-              </Link> 
+              </Link>
             </CarouselItem>
           ))}
         </CarouselContent>
 
-        <CarouselPrevious />
-        <CarouselNext />
+        {/* Navigation Buttons */}
+        <div className="hidden md:block">
+          <CarouselPrevious className="bg-black/50 border-white/10 text-white hover:bg-white hover:text-black" />
+          <CarouselNext className="bg-black/50 border-white/10 text-white hover:bg-white hover:text-black" />
+        </div>
       </Carousel>
     </div>
   );
