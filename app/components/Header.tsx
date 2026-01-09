@@ -1,19 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Menu, Search, X } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
 
 type Game = {
   id: number;
@@ -25,6 +20,7 @@ type Game = {
 const Header = () => {
   const router = useRouter();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
 
   const [search, setSearch] = useState("");
@@ -34,11 +30,10 @@ const Header = () => {
   const [open, setOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 🔹 1. Optimized Scroll Handler
+  /* 🔹 Hide header on scroll */
   useEffect(() => {
     const handleScroll = () => {
       const current = window.scrollY;
-      // Added a threshold (10px) to prevent jittery hiding on small movements
       if (Math.abs(current - lastScrollY.current) > 10) {
         if (current > lastScrollY.current && current > 80) {
           setHidden(true);
@@ -53,7 +48,7 @@ const Header = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 🔹 2. Handle Click Outside to close search
+  /* 🔹 Click outside: search */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -62,12 +57,20 @@ const Header = () => {
       ) {
         setOpen(false);
       }
+
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 🔹 3. Search with Cleanup (Fixes Race Conditions)
+  /* 🔹 Search (debounced + abort) */
   useEffect(() => {
     if (!search.trim()) {
       setResults([]);
@@ -103,12 +106,11 @@ const Header = () => {
       }
     };
 
-    // Debounce of 400ms
     const timeoutId = setTimeout(fetchData, 400);
 
     return () => {
       clearTimeout(timeoutId);
-      controller.abort(); // Cancel previous request if user keeps typing
+      controller.abort();
     };
   }, [search]);
 
@@ -116,7 +118,7 @@ const Header = () => {
     if (e.key === "Enter" && search.trim()) {
       router.push(`/games?search=${encodeURIComponent(search)}`);
       setOpen(false);
-      setIsMobileMenuOpen(false); // Close mobile menu if open
+      setIsMobileMenuOpen(false);
     }
     if (e.key === "Escape") setOpen(false);
   };
@@ -140,29 +142,29 @@ const Header = () => {
         </Link>
 
         {/* DESKTOP NAV */}
-        <nav className="hidden md:flex gap-8 text-sm font-medium text-white/80 ">
-          <Link href="/games" className="hover:text-primary transition-all duration-300">
-            Games
-          </Link>
-          <Link href="/genres" className="hover:text-primary transition-  all duration-300">
-            Genres
-          </Link>
-          <Link href="/new" className="hover:text-primary transition-all duration-300">
-            New Releases
+        <nav className="hidden md:flex gap-8 text-sm font-medium text-white/80">
+          <Link
+            href="/games"
+            className="relative text-white/80 hover:text-primary transition-all duration-300
+             after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
+             after:bg-primary after:transition-all after:duration-300
+             hover:after:w-full"
+          >
+            Checkout All Games
           </Link>
         </nav>
 
-        {/* SEARCH BAR CONTAINER */}
+        {/* DESKTOP SEARCH */}
         <div ref={searchContainerRef} className="relative hidden md:block w-72">
           <div className="relative flex items-center">
-            <Search className="absolute left-3 w-4 h-4 text-white/50 " />
+            <Search className="absolute left-3 w-4 h-4 text-white/50" />
             <Input
               value={search}
               placeholder="Search games..."
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={handleEnter}
               onFocus={() => search && setOpen(true)}
-              className="bg-white/5 border-white/10 text-white pl-9  "
+              className="bg-white/5 border-white/10 text-white pl-9"
             />
             {search && (
               <button
@@ -177,68 +179,84 @@ const Header = () => {
             )}
           </div>
 
-          {/* SEARCH DROPDOWN */}
-          {open && (
-            <div className="absolute mt-2 w-full bg-zinc-950 border border-white/10 rounded-md shadow-2xl overflow-hidden z-50">
-              {loading && (
-                <p className="p-4 text-sm text-white/50 text-center">
-                  Searching...
-                </p>
-              )}
+          {/* 🔽 SEARCH DROPDOWN */}
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                key="search-dropdown"
+                initial={{ opacity: 0, y: -5, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -5, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="absolute mt-2 w-full bg-zinc-950 border border-white/10 rounded-md shadow-2xl overflow-hidden z-50"
+              >
+                {loading && (
+                  <p className="p-4 text-sm text-white/50 text-center">
+                    Searching...
+                  </p>
+                )}
 
-              {!loading && results.length === 0 && (
-                <p className="p-4 text-sm text-white/50 text-center">
-                  No results found.
-                </p>
-              )}
+                {!loading && results.length === 0 && (
+                  <p className="p-4 text-sm text-white/50 text-center">
+                    No results found.
+                  </p>
+                )}
 
-              {results.map((game) => (
-                <Link
-                  key={game.id}
-                  href={`/games/${game.id}`}
-                  onClick={() => setOpen(false)}
-                  className="flex gap-3 p-3 hover:bg-white/10 transition items-center border-b border-white/5 last:border-0"
-                >
-                  <div className="relative w-12 h-14 rounded overflow-hidden shrink-0 bg-zinc-800">
-                    <Image
-                      src={game.background_image}
-                      alt={game.name}
-                      fill
-                      sizes="48px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate text-white">
-                      {game.name}
-                    </p>
-                    <p className="text-xs text-white/50">
-                      {game.released?.split("-")[0] || "TBA"}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+                {results.map((game) => (
+                  <Link
+                    key={game.id}
+                    href={`/games/${game.id}`}
+                    onClick={() => setOpen(false)}
+                    className="flex gap-3 p-3 hover:bg-white/10 transition items-center border-b border-white/5 last:border-0"
+                  >
+                    <div className="relative w-12 h-14 rounded overflow-hidden shrink-0 bg-zinc-800">
+                      <Image
+                        src={game.background_image}
+                        alt={game.name}
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate text-white">
+                        {game.name}
+                      </p>
+                      <p className="text-xs text-white/50">
+                        {game.released?.split("-")[0] || "TBA"}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* MOBILE MENU */}
-        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden text-white hover:bg-white/10"
-            >
-              <Menu />
-            </Button>
-          </SheetTrigger>
+        {/* MOBILE MENU BUTTON */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsMobileMenuOpen((v) => !v)}
+          className="md:hidden text-white hover:bg-white/10"
+        >
+          {isMobileMenuOpen ? <X /> : <Menu />}
+        </Button>
+      </div>
 
-          <SheetContent
-            side="left"
-            className="bg-zinc-950 border-r-white/10 text-white"
+      {/* 📱 MOBILE MENU PANEL */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            ref={mobileMenuRef}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="md:hidden bg-zinc-950 border-t border-white/10"
           >
-            <div className="mt-6 space-y-6">
+            <div className="px-6 py-4 space-y-4">
+              {/* Mobile Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-4 h-4 text-white/50" />
                 <Input
@@ -250,21 +268,22 @@ const Header = () => {
                 />
               </div>
 
+              {/* Mobile Links */}
               <div className="flex flex-col gap-4 text-lg">
-                <Link href="/games" onClick={() => setIsMobileMenuOpen(false)}>
-                  Games
-                </Link>
-                <Link href="/genres" onClick={() => setIsMobileMenuOpen(false)}>
-                  Genres
-                </Link>
-                <Link href="/new" onClick={() => setIsMobileMenuOpen(false)}>
-                  New Releases
+                <Link
+                  href="/games"
+                  className="relative text-white/80 hover:text-primary transition-all duration-300
+             after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
+             after:bg-primary after:transition-all after:duration-300
+             hover:after:w-full"
+                >
+                  Checkout All Games
                 </Link>
               </div>
             </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

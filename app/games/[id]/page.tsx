@@ -22,6 +22,7 @@ async function getGame(id: string): Promise<Game | null> {
     const res = await fetch(
       `https://api.rawg.io/api/games/${id}?key=14af43f3b477423b9ddd26df233927db`
     );
+
     if (!res.ok) return null;
     return res.json();
   } catch (error) {

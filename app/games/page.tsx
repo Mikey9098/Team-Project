@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import GameFilters from "../components/Gamefilters";
 
 // --- TYPES ---
 export type Game = {
@@ -37,10 +38,10 @@ export const GameCard = ({ game }: { game: Game }) => {
   return (
     <Link
       href={`/games/${game.id}`}
-      className="group relative block w-full bg-[#111217] rounded-2xl overflow-hidden shadow-lg transition-transform duration-300 hover:-translate-y-2"
+      className="group relative block w-full bg-[#111217] rounded-sm overflow-hidden shadow-lg transition-transform duration-300 hover:-translate-y-2"
     >
       {/* Image Section */}
-      <div className="relative aspect-[3/2] w-full overflow-hidden rounded-t-2xl">
+      <div className="relative aspect-[3/2] w-full overflow-hidden ">
         <Image
           fill
           src={game.background_image || "/placeholder.jpg"}
@@ -182,75 +183,47 @@ export default function GamesPage() {
   return (
     <Suspense fallback={<p>Loading...</p>}>
       <div className="min-h-screen px-6 py-10 text-white bg-zinc-950 pt-20 ">
-        <h1 className="text-3xl font-bold mb-8">Browse Games</h1>
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold mb-8">Browse Games</h1>
+          {/* FILTERS */}
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
+            {/* LEFT FILTER PANEL */}
+            <GameFilters
+              sort={sort}
+              genre={genre}
+              year={year}
+              genresList={genresList}
+              updateParam={updateParam}
+            />
 
-        {/* FILTERS */}
-        <div className="flex flex-wrap gap-4 mb-10">
-          <Select value={sort} onValueChange={(v) => updateParam("sort", v)}>
-            <SelectTrigger className="w-45">
-              <SelectValue placeholder="Sort" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="oldest">Oldest</SelectItem>
-              <SelectItem value="popular">Popular</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* DYNAMIC GENRE SELECT */}
-          <Select value={genre} onValueChange={(v) => updateParam("genre", v)}>
-            <SelectTrigger className="w-45">
-              <SelectValue placeholder="Genre" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]" position="popper">
-              <SelectItem value="all">All Genres</SelectItem>
-              {genresList.map((g) => (
-                <SelectItem key={g.id} value={g.slug}>
-                  {g.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={year} onValueChange={(v) => updateParam("year", v)}>
-            <SelectTrigger className="w-45">
-              <SelectValue placeholder="Release Year" />
-            </SelectTrigger>
-            <SelectContent className="bg-red-500">
-              <SelectItem value="all">All Years</SelectItem>
-              <SelectItem value="2024">2024</SelectItem>
-              <SelectItem value="2025">2025</SelectItem>
-              <SelectItem value="2026">2026</SelectItem>
-              <SelectItem value="2023">2023</SelectItem>
-              <SelectItem value="2022">2022</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* RIGHT GAME GRID */}
+            <div>
+              {loading ? (
+                <p className="text-zinc-400">Loading games...</p>
+              ) : (
+                <AnimatePresence mode="popLayout">
+                  <motion.div
+                    layout
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
+                  >
+                    {games.map((game) => (
+                      <motion.div
+                        key={game.id}
+                        layout
+                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        <GameCard game={game} />
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </AnimatePresence>
+              )}
+            </div>
+          </div>
         </div>
-
-        {loading ? (
-          <p className="text-zinc-400">Loading games...</p>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            <motion.div
-              layout
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
-            >
-              {games.map((game) => (
-                <motion.div
-                  key={game.id}
-                  layout
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  {/* USING THE REUSABLE COMPONENT */}
-                  <GameCard game={game} />
-                </motion.div>
-              ))}
-            </motion.div>
-          </AnimatePresence>
-        )}
       </div>
     </Suspense>
   );

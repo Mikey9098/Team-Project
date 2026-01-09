@@ -10,7 +10,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { motion, useMotionTemplate, useMotionValue } from "motion/react";
+import { motion } from "motion/react";
 
 type Genre = {
   id: number;
@@ -22,18 +22,28 @@ type Genre = {
 
 const Menu: React.FC = () => {
   const [genres, setGenres] = useState<Genre[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchGenres = async () => {
-      const res = await fetch(
-        "https://api.rawg.io/api/genres?key=14af43f3b477423b9ddd26df233927db"
-      );
-      const data: { results: Genre[] } = await res.json();
-      setGenres(data.results);
+      try {
+        const res = await fetch(
+          "https://api.rawg.io/api/genres?key=14af43f3b477423b9ddd26df233927db"
+        );
+        const data: { results: Genre[] } = await res.json();
+        setGenres(data.results);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchGenres();
   }, []);
+
+  // Skeleton items
+  const skeletonItems = Array.from({ length: 6 });
 
   return (
     <div className="relative w-full min-h-125 bg-black p-14 pt-20 overflow-hidden">
@@ -48,36 +58,45 @@ const Menu: React.FC = () => {
         className="relative z-10 w-full"
       >
         <CarouselContent className="-ml-4">
-          {genres.map((genre) => (
-            <CarouselItem
-              key={genre.id}
-              className="pl-4 basis-full sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
-            >
-              <Link href={`/genre/${genre.slug}`}>
-                <div className="group relative rounded-lg overflow-hidden border border-white/10 bg-zinc-900/50 transition-all duration-500 hover:border-white/40">
-                  <div className="relative h-48 overflow-hidden">
-                    <Image
-                      src={genre.image_background}
-                      alt={genre.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 25vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                  </div>
+          {loading
+            ? skeletonItems.map((_, i) => (
+                <CarouselItem
+                  key={i}
+                  className="pl-4 basis-full sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
+                >
+                  <div className="rounded-lg bg-zinc-900/50 border border-white/10 animate-pulse h-64" />
+                </CarouselItem>
+              ))
+            : genres.map((genre) => (
+                <CarouselItem
+                  key={genre.id}
+                  className="pl-4 basis-full sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
+                >
+                  <Link href={`/genre/${genre.slug}`}>
+                    <div className="group relative rounded-lg overflow-hidden border border-white/10 bg-zinc-900/50 transition-all duration-500 hover:border-white/40">
+                      <div className="relative h-48 overflow-hidden">
+                        <Image
+                          src={genre.image_background}
+                          alt={genre.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 25vw"
+                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                      </div>
 
-                  <div className="relative p-5">
-                    <h2 className="text-xl font-bold text-white group-hover:text-purple-400 transition-colors">
-                      {genre.name}
-                    </h2>
-                    <p className="text-xs text-white/50 uppercase tracking-widest mt-1">
-                      {genre.games_count.toLocaleString()} games
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            </CarouselItem>
-          ))}
+                      <div className="relative p-5">
+                        <h2 className="text-xl font-bold text-white group-hover:text-purple-400 transition-colors">
+                          {genre.name}
+                        </h2>
+                        <p className="text-xs text-white/50 uppercase tracking-widest mt-1">
+                          {genre.games_count.toLocaleString()} games
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                </CarouselItem>
+              ))}
         </CarouselContent>
 
         {/* Navigation Buttons */}
