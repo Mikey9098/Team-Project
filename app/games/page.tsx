@@ -5,10 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import {
+  Heart,
+  Sparkles,
+  ArrowRight,
+  Star,
+  X,
+  Loader2,
+  Calendar,
+} from "lucide-react";
 
 import GameFilters from "../components/Gamefilters";
 import { createClient } from "@/lib/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // --- TYPES ---
 export type Game = {
@@ -28,7 +37,51 @@ export type Genre = {
 
 const API_KEY = "14af43f3b477423b9ddd26df233927db";
 
-// --- COMPONENT: GAME CARD ---
+/* ----------------------------- UI HELPERS ----------------------------- */
+
+function yearOf(date?: string) {
+  if (!date) return "TBA";
+  const y = date.split("-")[0];
+  return y || "TBA";
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/75 backdrop-blur">
+      {children}
+    </span>
+  );
+}
+
+function LoadingGrid() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+      {Array.from({ length: 9 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-3xl overflow-hidden border border-white/10 bg-white/5"
+        >
+          <div className="relative h-[260px]">
+            <Skeleton className="h-full w-full bg-zinc-800" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+          </div>
+
+          <div className="p-7 space-y-4">
+            <Skeleton className="h-6 w-4/5 bg-zinc-800" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-20 rounded-full bg-zinc-800" />
+              <Skeleton className="h-6 w-24 rounded-full bg-zinc-800" />
+            </div>
+            <Skeleton className="h-6 w-24 rounded-full bg-zinc-800" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ----------------------------- GAME CARD ----------------------------- */
+
 export const GameCard = ({
   game,
   isFavorited,
@@ -40,87 +93,119 @@ export const GameCard = ({
   favLoading: boolean;
   onToggleFavorite: (game: Game) => void;
 }) => {
+  const releaseLabel = game.released ? yearOf(game.released) : "TBA";
+  const ratingLabel =
+    typeof game.rating === "number" ? game.rating.toFixed(1) : "N/A";
+
   return (
     <Link
       href={`/games/${game.id}`}
-      className="group relative block w-full bg-[#111217] rounded-sm overflow-hidden shadow-lg transition-transform duration-300 hover:-translate-y-2"
+      className="
+        group relative block w-full
+        rounded-3xl overflow-hidden
+        border border-white/10 bg-black/35
+        transition-all duration-300
+        hover:-translate-y-2 hover:scale-[1.01]
+        hover:border-primary/50
+        hover:shadow-[0_30px_90px_rgba(0,0,0,0.65)]
+      "
     >
-      {/* Image Section */}
-      <div className="relative aspect-[3/2] w-full overflow-hidden">
+      {/* IMAGE */}
+      <div className="relative h-[280px] w-full overflow-hidden">
         <Image
           fill
           src={game.background_image || "/placeholder.jpg"}
           alt={game.name}
-          className="object-cover transition-transform duration-500 group-hover:scale-110"
-          sizes="(max-width: 768px) 100vw, 25vw"
+          className="object-cover transition-transform duration-700 group-hover:scale-110"
+          sizes="(max-width: 768px) 100vw, 33vw"
         />
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
 
-        {/* ❤️ Favorite Button (overlay) */}
-        <button
-          type="button"
-          aria-label={
-            isFavorited ? "Remove from favorites" : "Add to favorites"
-          }
-          onClick={(e) => {
-            e.preventDefault(); // stop Link navigation
-            e.stopPropagation();
-            onToggleFavorite(game);
-          }}
-          disabled={favLoading}
-          className={`
-            absolute top-3 right-3 z-10
-            h-10 w-10 rounded-full grid place-items-center
-            border border-white/15 backdrop-blur-md
-            transition
-            ${
-              isFavorited
-                ? "bg-primary/90 text-black"
-                : "bg-black/40 text-white hover:bg-black/55"
-            }
-            ${favLoading ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}
-          `}
-        >
-          <Heart className={`w-5 h-5 ${isFavorited ? "fill-current" : ""}`} />
-        </button>
+        {/* TOP BAR (always aligned) */}
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-black/60 px-4 text-xs font-semibold text-white/85 backdrop-blur">
+              <Calendar className="h-4 w-4 text-white/70 shrink-0" />
+              <span className="truncate">{releaseLabel}</span>
+            </span>
+
+            <span className="hidden md:inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-black/60 px-4 text-xs font-semibold text-white/85 backdrop-blur">
+              <Star className="h-4 w-4 text-yellow-300" />
+              {ratingLabel}
+            </span>
+          </div>
+
+          {/* FAVORITE */}
+          <button
+            type="button"
+            aria-label={isFavorited ? "Remove favorite" : "Add favorite"}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFavorite(game);
+            }}
+            disabled={favLoading}
+            className={`
+              h-10 w-10 rounded-full grid place-items-center
+              border border-white/10 bg-black/60 backdrop-blur
+              transition hover:scale-105 active:scale-95
+              ${isFavorited ? "text-primary" : "text-white"}
+              ${favLoading ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}
+            `}
+          >
+            {favLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Heart
+                className={`h-5 w-5 ${isFavorited ? "fill-current" : ""}`}
+              />
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Content Section */}
-      <div className="p-4 flex flex-col justify-between h-32">
-        {/* Game Name */}
-        <h3 className="text-white font-bold text-lg line-clamp-1 group-hover:text-purple-400 transition-colors duration-300">
+      {/* CONTENT (fixed height -> bottoms even) */}
+      <div className="p-7 flex flex-col h-40 mb-10">
+        {/* TITLE — fixed height, never overlaps */}
+        <h3
+          className="
+      text-lg md:text-xl font-extrabold text-white/95
+      group-hover:text-primary transition
+      leading-snug
+      line-clamp-2
+      min-h-[3.2rem]   /* 👈 reserves space for 2 lines */
+    "
+        >
           {game.name}
         </h3>
 
-        {/* Genres + Rating */}
-        <div className="mt-2 flex items-center justify-between">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {game.genres?.slice(0, 2).map((genre) => (
-              <span
-                key={genre.id}
-                className="px-2 py-0.5 text-xs font-semibold text-purple-200 bg-purple-900/40 rounded-full uppercase"
-              >
-                {genre.name}
-              </span>
-            ))}
-          </div>
+        {/* GENRES — always below title */}
+        <div className="mt-3 flex flex-wrap gap-2 min-h-[28px]">
+          {game.genres?.slice(0, 2).map((g) => (
+            <Chip key={g.id}>{g.name}</Chip>
+          ))}
+        </div>
 
-          {/* Rating */}
-          <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full">
-            <span className="text-yellow-400 text-sm">★</span>
-            <span className="text-white text-xs font-semibold">
-              {game.rating || "N/A"}
-            </span>
-          </div>
+        {/* FOOTER — pinned */}
+        <div className="mt-auto pt-4 flex items-center justify-between">
+          <span className="text-sm text-white/55">
+            Released:{" "}
+            <span className="text-white/80">{game.released || "TBA"}</span>
+          </span>
+
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-white/85">
+            <Star className="h-4 w-4 text-yellow-300" />
+            {ratingLabel}
+          </span>
         </div>
       </div>
     </Link>
   );
 };
 
-// --- MAIN PAGE COMPONENT ---
+/* ----------------------------- PAGE ----------------------------- */
+
 export default function GamesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -148,7 +233,9 @@ export default function GamesPage() {
     router.push(`/games?${params.toString()}`);
   };
 
-  // Get session once + subscribe
+  const clearFilters = () => router.push("/games");
+
+  // auth
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.auth.getSession();
@@ -158,13 +245,13 @@ export default function GamesPage() {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id ?? null);
-      setFavoritesSet(new Set()); // reset favorites when auth changes
+      setFavoritesSet(new Set());
     });
 
     return () => sub.subscription.unsubscribe();
   }, [supabase]);
 
-  // 1) Fetch genre list
+  // genres
   useEffect(() => {
     const fetchGenres = async () => {
       try {
@@ -172,7 +259,7 @@ export default function GamesPage() {
           `https://api.rawg.io/api/genres?key=${API_KEY}`
         );
         const data = await res.json();
-        setGenresList(data.results);
+        setGenresList(data.results || []);
       } catch (err) {
         console.error("Failed to fetch genres list", err);
       }
@@ -180,24 +267,23 @@ export default function GamesPage() {
     fetchGenres();
   }, []);
 
-  // 2) Fetch games when filters change
+  // games
   const fetchGames = async () => {
     setLoading(true);
 
-    let url = `https://api.rawg.io/api/games?key=${API_KEY}&page_size=40`;
+    let url = `https://api.rawg.io/api/games?key=${API_KEY}&page_size=36`;
 
     if (sort === "newest") url += `&ordering=-released`;
     if (sort === "oldest") url += `&ordering=released`;
     if (sort === "popular") url += `&ordering=-rating`;
 
     if (genre !== "all") url += `&genres=${genre}`;
-
     if (year !== "all") url += `&dates=${year}-01-01,${year}-12-31`;
 
     try {
       const res = await fetch(url);
       const data = await res.json();
-      setGames(data.results.filter((g: Game) => g.background_image));
+      setGames((data.results || []).filter((g: Game) => g.background_image));
     } catch (err) {
       console.error("Failed to fetch games", err);
     } finally {
@@ -210,7 +296,7 @@ export default function GamesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort, genre, year]);
 
-  // 3) Load favorites for current games (ONE query)
+  // favorites load (1 query)
   useEffect(() => {
     const loadFavoritesForPage = async () => {
       setFavMsg(null);
@@ -228,36 +314,25 @@ export default function GamesPage() {
         .eq("user_id", userId)
         .in("game_id", ids);
 
-      if (error) {
-        console.error(error);
-        return;
-      }
-
+      if (error) return console.error(error);
       setFavoritesSet(new Set((data ?? []).map((r) => r.game_id)));
     };
 
     loadFavoritesForPage();
   }, [games, userId, supabase]);
 
-  // 4) Toggle favorite
+  // toggle favorite
   const toggleFavorite = async (game: Game) => {
     setFavMsg(null);
+    if (!userId) return setFavMsg("Please log in to save favorites.");
 
-    if (!userId) {
-      setFavMsg("Please log in to save favorites.");
-      return;
-    }
-
-    // lock per-card
     setFavBusyIds((prev) => new Set(prev).add(game.id));
-
     const wasFav = favoritesSet.has(game.id);
 
-    // optimistic UI
+    // optimistic
     setFavoritesSet((prev) => {
       const next = new Set(prev);
-      if (wasFav) next.delete(game.id);
-      else next.add(game.id);
+      wasFav ? next.delete(game.id) : next.add(game.id);
       return next;
     });
 
@@ -268,7 +343,6 @@ export default function GamesPage() {
           .delete()
           .eq("user_id", userId)
           .eq("game_id", game.id);
-
         if (error) throw error;
       } else {
         const { error } = await supabase.from("favorites").insert({
@@ -277,15 +351,13 @@ export default function GamesPage() {
           game_name: game.name,
           game_image: game.background_image ?? null,
         });
-
         if (error) throw error;
       }
     } catch (e: any) {
       // rollback
       setFavoritesSet((prev) => {
         const next = new Set(prev);
-        if (wasFav) next.add(game.id);
-        else next.delete(game.id);
+        wasFav ? next.add(game.id) : next.delete(game.id);
         return next;
       });
       setFavMsg(e?.message ?? "Failed to update favorites");
@@ -298,29 +370,47 @@ export default function GamesPage() {
     }
   };
 
+  const activeFilters =
+    (sort && sort !== "newest") || genre !== "all" || year !== "all";
+
   return (
-    <Suspense fallback={<p>Loading...</p>}>
-      <div className="min-h-screen px-6 py-10 text-white bg-zinc-950 pt-20">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-end justify-between gap-4 mb-6">
-            <h1 className="text-3xl font-bold">Browse Games</h1>
+    <Suspense fallback={<p className="text-white p-6">Loading…</p>}>
+      <div className="min-h-screen text-white bg-black">
+        <div className="pt-[72px]" />
+
+        {/* ✅ wider container -> bigger cards */}
+        <div className="mx-auto max-w-screen-2xl px-4 md:px-10 py-10">
+          {/* header */}
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-7">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 backdrop-blur">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                Browse the catalog
+              </div>
+              <h1 className="mt-3 text-3xl md:text-4xl font-black tracking-tight">
+                Browse Games
+              </h1>
+              <p className="mt-2 text-sm text-white/55 max-w-2xl">
+                Filter by genre, year, and sorting — then save your favorites.
+              </p>
+            </div>
+
             <Link
               href="/favorites"
-              className="text-sm text-white/70 hover:text-white transition underline-offset-4 hover:underline"
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition w-fit"
             >
-              View Favorites →
+              View Favorites
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
           {favMsg && (
-            <div className="mb-6 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+            <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
               {favMsg}
             </div>
           )}
 
-          {/* FILTERS */}
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
-            {/* LEFT FILTER PANEL */}
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-10">
             <GameFilters
               sort={sort}
               genre={genre}
@@ -329,24 +419,48 @@ export default function GamesPage() {
               updateParam={updateParam}
             />
 
-            {/* RIGHT GAME GRID */}
-            <div>
+            <div className="space-y-4">
+              {/* toolbar */}
+              <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
+                    <span className="font-semibold text-white/90">
+                      {loading ? "Loading…" : `${games.length} games`}
+                    </span>
+                    {genre !== "all" && <Chip>Genre: {genre}</Chip>}
+                    {year !== "all" && <Chip>Year: {year}</Chip>}
+                    {sort !== "newest" && <Chip>Sort: {sort}</Chip>}
+                  </div>
+
+                  {activeFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition w-fit"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* ✅ bigger cards: 3 cols on desktop */}
               {loading ? (
-                <p className="text-zinc-400">Loading games...</p>
+                <LoadingGrid />
               ) : (
                 <AnimatePresence mode="popLayout">
                   <motion.div
                     layout
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10"
                   >
                     {games.map((game) => (
                       <motion.div
                         key={game.id}
                         layout
-                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        initial={{ opacity: 0, y: 18, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        transition={{ duration: 0.25 }}
+                        exit={{ opacity: 0, y: 18, scale: 0.98 }}
+                        transition={{ duration: 0.22 }}
                       >
                         <GameCard
                           game={game}

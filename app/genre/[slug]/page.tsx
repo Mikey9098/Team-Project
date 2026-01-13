@@ -1,8 +1,9 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Calendar, Star, Trophy } from "lucide-react"; // Icons
+import { Trophy, Sparkles } from "lucide-react";
 import { RelatedGames } from "./(components)/RelatedGames";
+
 export type Game = {
   genres: any;
   id: number;
@@ -25,16 +26,9 @@ type Genre = {
 export const revalidate = 3600;
 const API_KEY = "14af43f3b477423b9ddd26df233927db";
 
-const getMetacriticColor = (score: number) => {
-  if (score >= 75) return "bg-green-500/20 text-green-400 border-green-500/30";
-  if (score >= 50)
-    return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-  return "bg-red-500/20 text-red-400 border-red-500/30";
-};
-
 async function getGamesByGenre(slug: string): Promise<Game[]> {
   const url = new URL("https://api.rawg.io/api/games");
-  url.searchParams.set("key", API_KEY!);
+  url.searchParams.set("key", API_KEY);
   url.searchParams.set("genres", slug);
   url.searchParams.set("page_size", "20");
   url.searchParams.set("ordering", "-metacritic");
@@ -60,6 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const genre = await getGenre(slug);
   if (!genre) return { title: "Not Found" };
+
   return {
     title: `Best ${genre.name} Games`,
     description: `Top rated ${genre.name} games including ${genre.games_count} titles.`,
@@ -69,57 +64,109 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function GenrePage({ params }: Props) {
   const { slug } = await params;
   const genre = await getGenre(slug);
-
-  if (!genre) notFound();
+  if (!genre) return notFound();
 
   const games = await getGamesByGenre(slug);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="relative h-[40vh] w-full overflow-hidden">
-        {genre.image_background && (
-          <Image
-            src={genre.image_background}
-            alt={genre.name}
-            width={1920}
-            height={1080}
-            className="object-cover opacity-40 scale-105"
-            priority
-          />
-        )}
+      {/* Offset for your fixed header (change 72px if your header height differs) */}
+      <div className="pt-18" />
 
-        <div className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
-
-        <div className="absolute bottom-0 left-0 w-full p-6 md:p-12">
-          <div className="max-w-7xl mx-auto">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-xs font-medium text-white mb-4">
-              <Trophy className="w-3 h-3 text-yellow-400" />
-              {genre.games_count.toLocaleString()} Titles Available
-            </span>
-            <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight mb-4 drop-shadow-xl">
-              {genre.name}
-            </h1>
-            {genre.description && (
-              <div
-                className="max-w-2xl text-zinc-300 text-sm md:text-base leading-relaxed line-clamp-2 md:line-clamp-3"
-                dangerouslySetInnerHTML={{ __html: genre.description }}
+      {/* HERO */}
+      <section className="relative">
+        <div className="relative h-[46vh] min-h-120 w-full overflow-hidden">
+          {genre.image_background ? (
+            <>
+              {/* base image */}
+              <Image
+                src={genre.image_background}
+                alt={genre.name}
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover opacity-60 scale-105"
               />
-            )}
+              {/* depth layer */}
+              <div className="absolute inset-0">
+                <Image
+                  src={genre.image_background}
+                  alt=""
+                  fill
+                  sizes="100vw"
+                  className="object-cover blur-2xl scale-110 opacity-20"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="h-full w-full bg-zinc-900 flex items-center justify-center text-zinc-500">
+              No Image Available
+            </div>
+          )}
+
+          {/* overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(255,255,255,0.10),transparent_45%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_30%,rgba(168,85,247,0.14),transparent_45%)]" />
+
+          {/* bottom content */}
+          <div className="absolute bottom-0 left-0 right-0">
+            <div className="mx-auto max-w-7xl px-4 md:px-6 pb-10 md:pb-12">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur-md">
+                  <Trophy className="w-3.5 h-3.5 text-yellow-300" />
+                  {genre.games_count.toLocaleString()} titles
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur-md">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  Top Metacritic picks
+                </span>
+              </div>
+
+              <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-[1.03] drop-shadow-[0_18px_60px_rgba(0,0,0,0.6)]">
+                {genre.name}
+              </h1>
+
+              {genre.description ? (
+                <div className="mt-5 max-w-3xl">
+                  <div className="rounded-3xl border border-white/10 bg-black/35 p-4 md:p-5 backdrop-blur-xl shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+                    <div
+                      className="text-sm md:text-base leading-relaxed text-zinc-200/90 line-clamp-3 md:line-clamp-4"
+                      dangerouslySetInnerHTML={{ __html: genre.description }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm md:text-base text-zinc-300/80 max-w-2xl">
+                  Explore the best games in {genre.name}, ranked by Metacritic.
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <main className="max-w-7xl mx-auto px-6 py-12 ">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
-            Top Rated
-            <span className="text-zinc-500 text-lg font-normal">
-              in {genre.name}
-            </span>
-          </h2>
+      {/* SECTION HEADER */}
+      <main className="mx-auto max-w-7xl px-4 md:px-6 py-10">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
+              Top Rated{" "}
+              <span className="text-zinc-400 font-normal">in {genre.name}</span>
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Sorted by Metacritic (page size: 20)
+            </p>
+          </div>
         </div>
+
+        <div className="mt-6 h-px bg-white/10" />
       </main>
-      <RelatedGames games={games} />
+
+      {/* LIST */}
+      <div className="mx-auto max-w-7xl px-4 md:px-6 pb-20">
+        <RelatedGames games={games} />
+      </div>
     </div>
   );
 }

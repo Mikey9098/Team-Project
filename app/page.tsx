@@ -1,12 +1,10 @@
 import GameCarousel from "./components/screenshot";
-import Menu from "./components/menu";
-import RecentAddedGames from "./components/recentAddedGames";
+import HomeMenu from "./components/menu";
 const page = () => {
   return (
     <>
       <GameCarousel />
-      <Menu />
-      <RecentAddedGames />
+      <HomeMenu />
     </>
   );
 };
