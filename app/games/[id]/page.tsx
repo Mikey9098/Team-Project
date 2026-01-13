@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
-
+import FavoriteGameButton from "@/app/components/FavoriteGameButton";
 type Game = {
   id: number;
   name: string;
@@ -119,6 +119,13 @@ export default async function GamePage({
                   ⭐ {game.rating} <span className="text-zinc-600">/ 5</span>
                 </span>
               </div>
+              <FavoriteGameButton
+                game={{
+                  id: game.id,
+                  name: game.name,
+                  background_image: game.background_image,
+                }}
+              />
 
               {game.metacritic && (
                 <div className="flex flex-col">

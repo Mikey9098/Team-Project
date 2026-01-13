@@ -1,19 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
+import { Heart } from "lucide-react";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import GameFilters from "../components/Gamefilters";
+import { createClient } from "@/lib/supabase/client";
 
 // --- TYPES ---
 export type Game = {
@@ -34,14 +29,24 @@ export type Genre = {
 const API_KEY = "14af43f3b477423b9ddd26df233927db";
 
 // --- COMPONENT: GAME CARD ---
-export const GameCard = ({ game }: { game: Game }) => {
+export const GameCard = ({
+  game,
+  isFavorited,
+  onToggleFavorite,
+  favLoading,
+}: {
+  game: Game;
+  isFavorited: boolean;
+  favLoading: boolean;
+  onToggleFavorite: (game: Game) => void;
+}) => {
   return (
     <Link
       href={`/games/${game.id}`}
       className="group relative block w-full bg-[#111217] rounded-sm overflow-hidden shadow-lg transition-transform duration-300 hover:-translate-y-2"
     >
       {/* Image Section */}
-      <div className="relative aspect-[3/2] w-full overflow-hidden ">
+      <div className="relative aspect-[3/2] w-full overflow-hidden">
         <Image
           fill
           src={game.background_image || "/placeholder.jpg"}
@@ -49,8 +54,37 @@ export const GameCard = ({ game }: { game: Game }) => {
           className="object-cover transition-transform duration-500 group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, 25vw"
         />
+
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
+
+        {/* ❤️ Favorite Button (overlay) */}
+        <button
+          type="button"
+          aria-label={
+            isFavorited ? "Remove from favorites" : "Add to favorites"
+          }
+          onClick={(e) => {
+            e.preventDefault(); // stop Link navigation
+            e.stopPropagation();
+            onToggleFavorite(game);
+          }}
+          disabled={favLoading}
+          className={`
+            absolute top-3 right-3 z-10
+            h-10 w-10 rounded-full grid place-items-center
+            border border-white/15 backdrop-blur-md
+            transition
+            ${
+              isFavorited
+                ? "bg-primary/90 text-black"
+                : "bg-black/40 text-white hover:bg-black/55"
+            }
+            ${favLoading ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}
+          `}
+        >
+          <Heart className={`w-5 h-5 ${isFavorited ? "fill-current" : ""}`} />
+        </button>
       </div>
 
       {/* Content Section */}
@@ -86,30 +120,11 @@ export const GameCard = ({ game }: { game: Game }) => {
   );
 };
 
-// --- COMPONENT: RELATED GAMES ---
-export const RelatedGames = ({ games }: { games: Game[] }) => {
-  return (
-    <section className="py-12 px-4 bg-black/80">
-      <div className="flex items-center justify-between mb-8 max-w-6xl mx-auto">
-        <h2 className="text-2xl font-bold text-white tracking-tight">
-          Related Titles
-        </h2>
-        <div className="h-1 flex-1 mx-4 bg-purple-900 rounded-full" />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
-        {games.map((game) => (
-          <GameCard key={game.id} game={game} />
-        ))}
-      </div>
-    </section>
-  );
-};
-
 // --- MAIN PAGE COMPONENT ---
 export default function GamesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
 
   // URL PARAMS
   const sort = searchParams.get("sort") || "newest";
@@ -117,20 +132,39 @@ export default function GamesPage() {
   const year = searchParams.get("year") || "all";
 
   const [games, setGames] = useState<Game[]>([]);
-  const [genresList, setGenresList] = useState<Genre[]>([]); // State for genres
+  const [genresList, setGenresList] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Favorites state
+  const [userId, setUserId] = useState<string | null>(null);
+  const [favoritesSet, setFavoritesSet] = useState<Set<number>>(new Set());
+  const [favBusyIds, setFavBusyIds] = useState<Set<number>>(new Set());
+  const [favMsg, setFavMsg] = useState<string | null>(null);
 
   const updateParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (value === "all") {
-      params.delete(key);
-    } else {
-      params.set(key, value);
-    }
+    if (value === "all") params.delete(key);
+    else params.set(key, value);
     router.push(`/games?${params.toString()}`);
   };
 
-  // 1. Fetch the list of Genres on mount
+  // Get session once + subscribe
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUserId(data.session?.user?.id ?? null);
+    };
+    init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+      setFavoritesSet(new Set()); // reset favorites when auth changes
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, [supabase]);
+
+  // 1) Fetch genre list
   useEffect(() => {
     const fetchGenres = async () => {
       try {
@@ -146,24 +180,19 @@ export default function GamesPage() {
     fetchGenres();
   }, []);
 
-  // 2. Fetch Games when filters change
+  // 2) Fetch games when filters change
   const fetchGames = async () => {
     setLoading(true);
 
     let url = `https://api.rawg.io/api/games?key=${API_KEY}&page_size=40`;
 
-    // SORT
     if (sort === "newest") url += `&ordering=-released`;
     if (sort === "oldest") url += `&ordering=released`;
     if (sort === "popular") url += `&ordering=-rating`;
 
-    // GENRE
     if (genre !== "all") url += `&genres=${genre}`;
 
-    // YEAR
-    if (year !== "all") {
-      url += `&dates=${year}-01-01,${year}-12-31`;
-    }
+    if (year !== "all") url += `&dates=${year}-01-01,${year}-12-31`;
 
     try {
       const res = await fetch(url);
@@ -178,13 +207,117 @@ export default function GamesPage() {
 
   useEffect(() => {
     fetchGames();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort, genre, year]);
+
+  // 3) Load favorites for current games (ONE query)
+  useEffect(() => {
+    const loadFavoritesForPage = async () => {
+      setFavMsg(null);
+      if (!userId) {
+        setFavoritesSet(new Set());
+        return;
+      }
+      if (!games.length) return;
+
+      const ids = games.map((g) => g.id);
+
+      const { data, error } = await supabase
+        .from("favorites")
+        .select("game_id")
+        .eq("user_id", userId)
+        .in("game_id", ids);
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setFavoritesSet(new Set((data ?? []).map((r) => r.game_id)));
+    };
+
+    loadFavoritesForPage();
+  }, [games, userId, supabase]);
+
+  // 4) Toggle favorite
+  const toggleFavorite = async (game: Game) => {
+    setFavMsg(null);
+
+    if (!userId) {
+      setFavMsg("Please log in to save favorites.");
+      return;
+    }
+
+    // lock per-card
+    setFavBusyIds((prev) => new Set(prev).add(game.id));
+
+    const wasFav = favoritesSet.has(game.id);
+
+    // optimistic UI
+    setFavoritesSet((prev) => {
+      const next = new Set(prev);
+      if (wasFav) next.delete(game.id);
+      else next.add(game.id);
+      return next;
+    });
+
+    try {
+      if (wasFav) {
+        const { error } = await supabase
+          .from("favorites")
+          .delete()
+          .eq("user_id", userId)
+          .eq("game_id", game.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("favorites").insert({
+          user_id: userId,
+          game_id: game.id,
+          game_name: game.name,
+          game_image: game.background_image ?? null,
+        });
+
+        if (error) throw error;
+      }
+    } catch (e: any) {
+      // rollback
+      setFavoritesSet((prev) => {
+        const next = new Set(prev);
+        if (wasFav) next.add(game.id);
+        else next.delete(game.id);
+        return next;
+      });
+      setFavMsg(e?.message ?? "Failed to update favorites");
+    } finally {
+      setFavBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(game.id);
+        return next;
+      });
+    }
+  };
 
   return (
     <Suspense fallback={<p>Loading...</p>}>
-      <div className="min-h-screen px-6 py-10 text-white bg-zinc-950 pt-20 ">
+      <div className="min-h-screen px-6 py-10 text-white bg-zinc-950 pt-20">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Browse Games</h1>
+          <div className="flex items-end justify-between gap-4 mb-6">
+            <h1 className="text-3xl font-bold">Browse Games</h1>
+            <Link
+              href="/favorites"
+              className="text-sm text-white/70 hover:text-white transition underline-offset-4 hover:underline"
+            >
+              View Favorites →
+            </Link>
+          </div>
+
+          {favMsg && (
+            <div className="mb-6 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+              {favMsg}
+            </div>
+          )}
+
           {/* FILTERS */}
           <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
             {/* LEFT FILTER PANEL */}
@@ -215,7 +348,12 @@ export default function GamesPage() {
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ duration: 0.25 }}
                       >
-                        <GameCard game={game} />
+                        <GameCard
+                          game={game}
+                          isFavorited={favoritesSet.has(game.id)}
+                          favLoading={favBusyIds.has(game.id)}
+                          onToggleFavorite={toggleFavorite}
+                        />
                       </motion.div>
                     ))}
                   </motion.div>

@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Menu, Search, X } from "lucide-react";
+import { Menu, Search, X, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/client";
 
 type Game = {
   id: number;
@@ -17,11 +18,15 @@ type Game = {
   released: string;
 };
 
-const Header = () => {
+export default function Header() {
   const router = useRouter();
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
+
+  // ✅ Create supabase ONCE (important)
+  const [supabase] = useState(() => createClient());
+  const firstLoadRef = useRef(true);
 
   const [search, setSearch] = useState("");
   const [hidden, setHidden] = useState(false);
@@ -30,16 +35,67 @@ const Header = () => {
   const [open, setOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  /* 🔹 Hide header on scroll */
+  // Auth + profile
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const fetchProfile = async () => {
+    if (firstLoadRef.current) setAuthLoading(true);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user ?? null;
+
+      if (!user) {
+        setUserEmail(null);
+        setUsername(null);
+        return;
+      }
+
+      setUserEmail(user.email ?? null);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      setUsername(profile?.username ?? null);
+    } finally {
+      setAuthLoading(false);
+      firstLoadRef.current = false; // ✅ after first successful run
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async () => {
+      await fetchProfile();
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, [supabase]);
+
+  const handleLogout = async () => {
+    setUserEmail(null);
+    setUsername(null);
+    setIsMobileMenuOpen(false);
+
+    await supabase.auth.signOut();
+
+    router.replace("/login"); 
+    router.refresh();
+  };
+
+  /* Hide header on scroll */
   useEffect(() => {
     const handleScroll = () => {
       const current = window.scrollY;
       if (Math.abs(current - lastScrollY.current) > 10) {
-        if (current > lastScrollY.current && current > 80) {
-          setHidden(true);
-        } else {
-          setHidden(false);
-        }
+        if (current > lastScrollY.current && current > 80) setHidden(true);
+        else setHidden(false);
         lastScrollY.current = current;
       }
     };
@@ -48,7 +104,7 @@ const Header = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  /* 🔹 Click outside: search */
+  /* Click outside: search + mobile menu */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -70,7 +126,7 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /* 🔹 Search (debounced + abort) */
+  /* Search (debounced + abort) */
   useEffect(() => {
     if (!search.trim()) {
       setResults([]);
@@ -98,9 +154,7 @@ const Header = () => {
           );
         }
       } catch (err: any) {
-        if (err.name !== "AbortError") {
-          console.error("Search error:", err);
-        }
+        if (err.name !== "AbortError") console.error("Search error:", err);
       } finally {
         if (!signal.aborted) setLoading(false);
       }
@@ -122,6 +176,9 @@ const Header = () => {
     }
     if (e.key === "Escape") setOpen(false);
   };
+
+  const displayName = username ?? userEmail ?? "User";
+  const avatarLetter = displayName.slice(0, 1).toUpperCase();
 
   return (
     <header
@@ -150,8 +207,20 @@ const Header = () => {
              after:bg-primary after:transition-all after:duration-300
              hover:after:w-full"
           >
-            Checkout All Games
+            Browse All Games
           </Link>
+
+          {!authLoading && userEmail && (
+            <Link
+              href="/profile"
+              className="relative text-white/80 hover:text-primary transition-all duration-300
+               after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
+               after:bg-primary after:transition-all after:duration-300
+               hover:after:w-full"
+            >
+              My Profile
+            </Link>
+          )}
         </nav>
 
         {/* DESKTOP SEARCH */}
@@ -179,7 +248,6 @@ const Header = () => {
             )}
           </div>
 
-          {/* 🔽 SEARCH DROPDOWN */}
           <AnimatePresence>
             {open && (
               <motion.div
@@ -233,6 +301,59 @@ const Header = () => {
           </AnimatePresence>
         </div>
 
+        {/* DESKTOP AUTH */}
+        <div className="hidden md:flex items-center gap-2">
+          {authLoading ? (
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-white/10 animate-pulse" />
+              <div className="h-4 w-24 rounded bg-white/10 animate-pulse" />
+              <div className="h-9 w-20 rounded-md bg-white/10 animate-pulse" />
+            </div>
+          ) : !userEmail ? (
+            <>
+              <Button
+                asChild
+                variant="ghost"
+                className="text-white hover:bg-white/10"
+              >
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button
+                asChild
+                className="bg-primary text-black hover:bg-primary/90"
+              >
+                <Link href="/signup">Sign up</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white/10 transition"
+              >
+                <div className="h-9 w-9 rounded-full bg-white/10 border border-white/10 grid place-items-center font-semibold">
+                  {avatarLetter}
+                </div>
+                <div className="leading-tight">
+                  <p className="text-sm text-white font-medium max-w-40 truncate">
+                    {displayName}
+                  </p>
+                  <p className="text-xs text-white/50">My Profile</p>
+                </div>
+              </Link>
+
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="text-white hover:border-primary hover:border-2 hover:bg-transparent hover:text-primary"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </>
+          )}
+        </div>
+
         {/* MOBILE MENU BUTTON */}
         <Button
           variant="ghost"
@@ -244,7 +365,7 @@ const Header = () => {
         </Button>
       </div>
 
-      {/* 📱 MOBILE MENU PANEL */}
+      {/* MOBILE MENU PANEL */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -256,7 +377,6 @@ const Header = () => {
             className="md:hidden bg-zinc-950 border-t border-white/10"
           >
             <div className="px-6 py-4 space-y-4">
-              {/* Mobile Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-4 h-4 text-white/50" />
                 <Input
@@ -268,17 +388,95 @@ const Header = () => {
                 />
               </div>
 
-              {/* Mobile Links */}
               <div className="flex flex-col gap-4 text-lg">
                 <Link
                   href="/games"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="relative text-white/80 hover:text-primary transition-all duration-300
-             after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
-             after:bg-primary after:transition-all after:duration-300
-             hover:after:w-full"
+                    after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
+                    after:bg-primary after:transition-all after:duration-300
+                    hover:after:w-full"
                 >
-                  Checkout All Games
+                  Browse All Games
                 </Link>
+
+                {!authLoading && userEmail && (
+                  <Link
+                    href="/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="relative text-white/80 hover:text-primary transition-all duration-300
+                      after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
+                      after:bg-primary after:transition-all after:duration-300
+                      hover:after:w-full"
+                  >
+                    My Profile
+                  </Link>
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
+                {authLoading ? (
+                  <div className="flex items-center gap-3 px-2 py-2">
+                    <div className="h-9 w-9 rounded-full bg-white/10 animate-pulse" />
+                    <div className="flex-1">
+                      <div className="h-4 w-28 rounded bg-white/10 animate-pulse" />
+                      <div className="h-3 w-20 rounded bg-white/10 animate-pulse mt-2" />
+                    </div>
+                  </div>
+                ) : !userEmail ? (
+                  <>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="justify-start text-white hover:bg-white/10"
+                    >
+                      <Link
+                        href="/login"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Login
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      className="justify-start bg-primary text-black hover:bg-primary/90"
+                    >
+                      <Link
+                        href="/signup"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Sign up
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/profile"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-white/10 transition"
+                    >
+                      <div className="h-9 w-9 rounded-full bg-white/10 border border-white/10 grid place-items-center font-semibold">
+                        {avatarLetter}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-white font-medium truncate">
+                          {displayName}
+                        </p>
+                        <p className="text-xs text-white/50">My Profile</p>
+                      </div>
+                    </Link>
+
+                    <Button
+                      variant="ghost"
+                      onClick={handleLogout}
+                      className="justify-start text-white hover:bg-white/10"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
@@ -286,6 +484,4 @@ const Header = () => {
       </AnimatePresence>
     </header>
   );
-};
-
-export default Header;
+}

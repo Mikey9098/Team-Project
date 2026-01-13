@@ -1,0 +1,143 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Mail, Lock, Loader2 } from "lucide-react";
+
+export default function LoginPage() {
+  const supabase = createClient();
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [msg, setMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    setLoading(true);
+
+    try {
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<{ error: { message: string } }>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error("Login timed out. Check internet / Supabase URL.")
+              ),
+            12000
+          )
+        ),
+      ]);
+
+      // @ts-ignore
+      const error = result?.error;
+      if (error) {
+        setLoading(false);
+        return setMsg(error.message);
+      }
+
+      window.location.href = "/";
+    } catch (err: any) {
+      setLoading(false);
+      setMsg(err?.message ?? "Login failed");
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+      <div className="w-full max-w-md">
+        {/* Card */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl overflow-hidden">
+          <div className="p-6 border-b border-white/10">
+            <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+            <p className="text-sm text-white/60 mt-1">
+              Log in to continue exploring games.
+            </p>
+          </div>
+
+          <form onSubmit={onSubmit} className="p-6 space-y-4">
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="text-sm text-white/70">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                <Input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  type="email"
+                  required
+                  className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <label className="text-sm text-white/70">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                <Input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  type="password"
+                  required
+                  className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+                />
+              </div>
+            </div>
+
+            {/* Error / message */}
+            {msg && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {msg}
+              </div>
+            )}
+
+            {/* Button */}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-primary text-black hover:bg-primary/90"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in...
+                </span>
+              ) : (
+                "Log in"
+              )}
+            </Button>
+
+            {/* Footer */}
+            <div className="text-sm text-white/60 flex items-center justify-between">
+              <Link className="hover:text-white transition" href="/signup">
+                Don’t have an account? Sign up
+              </Link>
+              <Link
+                className="hover:text-white transition"
+                href="/forgot-password"
+              >
+                Forgot password?
+              </Link>
+            </div>
+          </form>
+        </div>
+
+        <p className="text-xs text-white/40 mt-4 text-center">
+          By logging in you agree to our terms.
+        </p>
+      </div>
+    </div>
+  );
+}

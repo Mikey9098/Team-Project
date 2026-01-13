@@ -50,14 +50,6 @@ const RecentAddedGames: React.FC = () => {
         <h1 className="text-white text-3xl font-bold tracking-tight">
           Recently Added
         </h1>
-
-        <Link
-          href="/recently-added"
-          className="flex items-center gap-2 text-white text-lg font-bold transition-colors duration-300 hover:text-purple-400 group"
-        >
-          All Games
-          <ArrowRight className="transition-transform group-hover:translate-x-1" />
-        </Link>
       </div>
 
       <Carousel
