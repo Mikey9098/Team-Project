@@ -227,7 +227,6 @@ export default function Header() {
         >
           GameHub
         </Link>
-
         {/* DESKTOP NAV */}
         <nav className="hidden md:flex gap-8 text-sm font-medium text-white/80">
           <Link
@@ -252,8 +251,7 @@ export default function Header() {
             </Link>
           )}
         </nav>
-
-        {/* DESKTOP SEARCH */}
+        z{/* DESKTOP SEARCH */}
         <div ref={searchContainerRef} className="relative hidden md:block w-72">
           <div className="relative flex items-center">
             <Search className="absolute left-3 w-4 h-4 text-white/50" />
@@ -330,7 +328,6 @@ export default function Header() {
             )}
           </AnimatePresence>
         </div>
-
         {/* DESKTOP AUTH */}
         <div className="hidden md:flex items-center gap-2">
           {authLoading ? (
@@ -340,7 +337,7 @@ export default function Header() {
               <Button
                 asChild
                 variant="ghost"
-                className="text-white hover:bg-white/10"
+                className="text-white hover:border-primary hover:text-primary hover:border-2 transition-all duration-300"
               >
                 <Link href="/login">Login</Link>
               </Button>
@@ -382,7 +379,6 @@ export default function Header() {
             </>
           )}
         </div>
-
         {/* MOBILE MENU BUTTON */}
         <Button
           variant="ghost"
