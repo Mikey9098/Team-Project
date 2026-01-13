@@ -242,25 +242,15 @@ export default function Header() {
 
           {isLoggedIn && (
             <Link
-              href="/profile"
+              href="/favorites"
               className="relative text-white/80 hover:text-primary transition-all duration-300
-               after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
-               after:bg-primary after:transition-all after:duration-300
-               hover:after:w-full"
-            >
-              My Profile
-            </Link>
-          )}
-
-          <Link
-            href="/favorites"
-            className="relative text-white/80 hover:text-primary transition-all duration-300
              after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
              after:bg-primary after:transition-all after:duration-300
              hover:after:w-full"
-          >
-            Favorites
-          </Link>
+            >
+              Favorites
+            </Link>
+          )}
         </nav>
 
         {/* DESKTOP SEARCH */}
