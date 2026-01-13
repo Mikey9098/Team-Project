@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Menu, Search, X, LogOut } from "lucide-react";
+import { Menu, Search, X, LogOut, User } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { Button } from "@/components/ui/button";
@@ -18,75 +18,111 @@ type Game = {
   released: string;
 };
 
+function AvatarCircle({ label }: { label: string }) {
+  const letter = (label?.trim()?.[0] ?? "?").toUpperCase();
+  return (
+    <div className="h-9 w-9 rounded-full border border-white/15 bg-white/10 grid place-items-center font-bold text-sm text-white">
+      {letter}
+    </div>
+  );
+}
+
+function SkeletonPill() {
+  return (
+    <div className="h-9 w-40 rounded-full bg-white/10 animate-pulse border border-white/10" />
+  );
+}
+
 export default function Header() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
-
-  // ✅ Create supabase ONCE (important)
-  const [supabase] = useState(() => createClient());
   const firstLoadRef = useRef(true);
 
   const [search, setSearch] = useState("");
   const [hidden, setHidden] = useState(false);
   const [results, setResults] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [openSearch, setOpenSearch] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Auth + profile
+  // auth UI
+  const [authLoading, setAuthLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
 
-  const fetchProfile = async () => {
+  const displayName = username || userEmail || "";
+
+  async function fetchAuthAndProfile() {
+    // show skeleton only on first load
     if (firstLoadRef.current) setAuthLoading(true);
 
     try {
       const { data } = await supabase.auth.getSession();
-      const user = data.session?.user ?? null;
+      const sessionUser = data.session?.user ?? null;
 
-      if (!user) {
+      if (!sessionUser) {
+        setUserId(null);
         setUserEmail(null);
         setUsername(null);
         return;
       }
 
-      setUserEmail(user.email ?? null);
+      setUserId(sessionUser.id);
+      setUserEmail(sessionUser.email ?? null);
 
-      const { data: profile } = await supabase
+      // Try profiles.username; if table/row missing, just fallback to email
+      const { data: profile, error } = await supabase
         .from("profiles")
         .select("username")
-        .eq("id", user.id)
+        .eq("id", sessionUser.id)
         .maybeSingle();
 
-      setUsername(profile?.username ?? null);
+      if (!error) {
+        setUsername(profile?.username ?? null);
+      } else {
+        // Don't block UI if profiles query fails
+        console.warn("profiles fetch failed:", error.message);
+        setUsername(null);
+      }
     } finally {
       setAuthLoading(false);
-      firstLoadRef.current = false; // ✅ after first successful run
+      firstLoadRef.current = false;
     }
-  };
+  }
 
   useEffect(() => {
-    fetchProfile();
+    fetchAuthAndProfile();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async () => {
-      await fetchProfile();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      // update instantly, then fetch profile
+      const u = session?.user ?? null;
+      setUserId(u?.id ?? null);
+      setUserEmail(u?.email ?? null);
+      setUsername(null);
+      setAuthLoading(false); // important: don’t get stuck
+      fetchAuthAndProfile();
     });
 
     return () => sub.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   const handleLogout = async () => {
+    // update UI immediately
+    setUserId(null);
     setUserEmail(null);
     setUsername(null);
     setIsMobileMenuOpen(false);
 
     await supabase.auth.signOut();
 
-    router.replace("/login"); 
-    router.refresh();
+    // hard redirect so everything updates everywhere
+    window.location.href = "/login";
   };
 
   /* Hide header on scroll */
@@ -94,26 +130,23 @@ export default function Header() {
     const handleScroll = () => {
       const current = window.scrollY;
       if (Math.abs(current - lastScrollY.current) > 10) {
-        if (current > lastScrollY.current && current > 80) setHidden(true);
-        else setHidden(false);
+        setHidden(current > lastScrollY.current && current > 80);
         lastScrollY.current = current;
       }
     };
-
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  /* Click outside: search + mobile menu */
+  /* Click outside */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         searchContainerRef.current &&
         !searchContainerRef.current.contains(event.target as Node)
       ) {
-        setOpen(false);
+        setOpenSearch(false);
       }
-
       if (
         mobileMenuRef.current &&
         !mobileMenuRef.current.contains(event.target as Node)
@@ -121,16 +154,15 @@ export default function Header() {
         setIsMobileMenuOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /* Search (debounced + abort) */
+  /* Search (debounced) */
   useEffect(() => {
     if (!search.trim()) {
       setResults([]);
-      setOpen(false);
+      setOpenSearch(false);
       return;
     }
 
@@ -138,8 +170,8 @@ export default function Header() {
     const signal = controller.signal;
 
     const fetchData = async () => {
-      setLoading(true);
-      setOpen(true);
+      setLoadingSearch(true);
+      setOpenSearch(true);
       try {
         const res = await fetch(
           `https://api.rawg.io/api/games?key=14af43f3b477423b9ddd26df233927db&search=${encodeURIComponent(
@@ -156,12 +188,11 @@ export default function Header() {
       } catch (err: any) {
         if (err.name !== "AbortError") console.error("Search error:", err);
       } finally {
-        if (!signal.aborted) setLoading(false);
+        if (!signal.aborted) setLoadingSearch(false);
       }
     };
 
     const timeoutId = setTimeout(fetchData, 400);
-
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
@@ -171,14 +202,13 @@ export default function Header() {
   const handleEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && search.trim()) {
       router.push(`/games?search=${encodeURIComponent(search)}`);
-      setOpen(false);
+      setOpenSearch(false);
       setIsMobileMenuOpen(false);
     }
-    if (e.key === "Escape") setOpen(false);
+    if (e.key === "Escape") setOpenSearch(false);
   };
 
-  const displayName = username ?? userEmail ?? "User";
-  const avatarLetter = displayName.slice(0, 1).toUpperCase();
+  const isLoggedIn = !!userId;
 
   return (
     <header
@@ -210,7 +240,7 @@ export default function Header() {
             Browse All Games
           </Link>
 
-          {!authLoading && userEmail && (
+          {isLoggedIn && (
             <Link
               href="/profile"
               className="relative text-white/80 hover:text-primary transition-all duration-300
@@ -221,6 +251,16 @@ export default function Header() {
               My Profile
             </Link>
           )}
+
+          <Link
+            href="/favorites"
+            className="relative text-white/80 hover:text-primary transition-all duration-300
+             after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
+             after:bg-primary after:transition-all after:duration-300
+             hover:after:w-full"
+          >
+            Favorites
+          </Link>
         </nav>
 
         {/* DESKTOP SEARCH */}
@@ -232,14 +272,14 @@ export default function Header() {
               placeholder="Search games..."
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={handleEnter}
-              onFocus={() => search && setOpen(true)}
+              onFocus={() => search && setOpenSearch(true)}
               className="bg-white/5 border-white/10 text-white pl-9"
             />
             {search && (
               <button
                 onClick={() => {
                   setSearch("");
-                  setOpen(false);
+                  setOpenSearch(false);
                 }}
                 className="absolute right-3 hover:text-white text-white/50"
               >
@@ -249,7 +289,7 @@ export default function Header() {
           </div>
 
           <AnimatePresence>
-            {open && (
+            {openSearch && (
               <motion.div
                 key="search-dropdown"
                 initial={{ opacity: 0, y: -5, height: 0 }}
@@ -258,13 +298,13 @@ export default function Header() {
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 className="absolute mt-2 w-full bg-zinc-950 border border-white/10 rounded-md shadow-2xl overflow-hidden z-50"
               >
-                {loading && (
+                {loadingSearch && (
                   <p className="p-4 text-sm text-white/50 text-center">
                     Searching...
                   </p>
                 )}
 
-                {!loading && results.length === 0 && (
+                {!loadingSearch && results.length === 0 && (
                   <p className="p-4 text-sm text-white/50 text-center">
                     No results found.
                   </p>
@@ -274,7 +314,7 @@ export default function Header() {
                   <Link
                     key={game.id}
                     href={`/games/${game.id}`}
-                    onClick={() => setOpen(false)}
+                    onClick={() => setOpenSearch(false)}
                     className="flex gap-3 p-3 hover:bg-white/10 transition items-center border-b border-white/5 last:border-0"
                   >
                     <div className="relative w-12 h-14 rounded overflow-hidden shrink-0 bg-zinc-800">
@@ -304,12 +344,8 @@ export default function Header() {
         {/* DESKTOP AUTH */}
         <div className="hidden md:flex items-center gap-2">
           {authLoading ? (
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-white/10 animate-pulse" />
-              <div className="h-4 w-24 rounded bg-white/10 animate-pulse" />
-              <div className="h-9 w-20 rounded-md bg-white/10 animate-pulse" />
-            </div>
-          ) : !userEmail ? (
+            <SkeletonPill />
+          ) : !isLoggedIn ? (
             <>
               <Button
                 asChild
@@ -327,25 +363,28 @@ export default function Header() {
             </>
           ) : (
             <>
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white/10 transition"
+              <div className="flex items-center gap-2">
+                <AvatarCircle label={displayName} />
+                <div className="text-sm text-white/80 max-w-44 truncate">
+                  {username || userEmail}
+                </div>
+              </div>
+
+              <Button
+                asChild
+                variant="ghost"
+                className="text-white hover:bg-white/10"
               >
-                <div className="h-9 w-9 rounded-full bg-white/10 border border-white/10 grid place-items-center font-semibold">
-                  {avatarLetter}
-                </div>
-                <div className="leading-tight">
-                  <p className="text-sm text-white font-medium max-w-40 truncate">
-                    {displayName}
-                  </p>
-                  <p className="text-xs text-white/50">My Profile</p>
-                </div>
-              </Link>
+                <Link href="/profile">
+                  <User className="w-4 h-4 mr-2" />
+                  My Profile
+                </Link>
+              </Button>
 
               <Button
                 variant="ghost"
                 onClick={handleLogout}
-                className="text-white hover:border-primary hover:border-2 hover:bg-transparent hover:text-primary"
+                className="text-white hover:bg-white/10"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
@@ -365,7 +404,7 @@ export default function Header() {
         </Button>
       </div>
 
-      {/* MOBILE MENU PANEL */}
+      {/* MOBILE MENU */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -389,25 +428,19 @@ export default function Header() {
               </div>
 
               <div className="flex flex-col gap-4 text-lg">
-                <Link
-                  href="/games"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="relative text-white/80 hover:text-primary transition-all duration-300
-                    after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
-                    after:bg-primary after:transition-all after:duration-300
-                    hover:after:w-full"
-                >
+                <Link href="/games" onClick={() => setIsMobileMenuOpen(false)}>
                   Browse All Games
                 </Link>
-
-                {!authLoading && userEmail && (
+                <Link
+                  href="/favorites"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Favorites
+                </Link>
+                {isLoggedIn && (
                   <Link
                     href="/profile"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="relative text-white/80 hover:text-primary transition-all duration-300
-                      after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0
-                      after:bg-primary after:transition-all after:duration-300
-                      hover:after:w-full"
                   >
                     My Profile
                   </Link>
@@ -416,14 +449,8 @@ export default function Header() {
 
               <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
                 {authLoading ? (
-                  <div className="flex items-center gap-3 px-2 py-2">
-                    <div className="h-9 w-9 rounded-full bg-white/10 animate-pulse" />
-                    <div className="flex-1">
-                      <div className="h-4 w-28 rounded bg-white/10 animate-pulse" />
-                      <div className="h-3 w-20 rounded bg-white/10 animate-pulse mt-2" />
-                    </div>
-                  </div>
-                ) : !userEmail ? (
+                  <SkeletonPill />
+                ) : !isLoggedIn ? (
                   <>
                     <Button
                       asChild
@@ -451,22 +478,23 @@ export default function Header() {
                   </>
                 ) : (
                   <>
-                    <Link
-                      href="/profile"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-white/10 transition"
+                    <div className="flex items-center gap-2 px-2 text-white/80">
+                      <AvatarCircle label={displayName} />
+                      <span className="truncate">{username || userEmail}</span>
+                    </div>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="justify-start text-white hover:bg-white/10"
                     >
-                      <div className="h-9 w-9 rounded-full bg-white/10 border border-white/10 grid place-items-center font-semibold">
-                        {avatarLetter}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm text-white font-medium truncate">
-                          {displayName}
-                        </p>
-                        <p className="text-xs text-white/50">My Profile</p>
-                      </div>
-                    </Link>
-
+                      <Link
+                        href="/profile"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        My Profile
+                      </Link>
+                    </Button>
                     <Button
                       variant="ghost"
                       onClick={handleLogout}
