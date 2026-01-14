@@ -26,12 +26,23 @@ type Game = {
   released: string;
 };
 
-function AvatarCircle({ label }: { label: string }) {
+function AvatarCircle({ label, src }: { label: string; src?: string | null }) {
   const letter = (label?.trim()?.[0] ?? "?").toUpperCase();
   return (
     <div className="relative h-9 w-9 rounded-full overflow-hidden border border-white/15 bg-white/10 grid place-items-center font-bold text-sm text-white">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-transparent to-transparent" />
-      <span className="relative">{letter}</span>
+      {src ? (
+        <Image
+          src={src}
+          alt="Avatar"
+          fill
+          sizes="36px"
+          className="object-cover"
+          priority={false}
+        />
+      ) : (
+        <span className="relative">{letter}</span>
+      )}
     </div>
   );
 }
@@ -87,6 +98,7 @@ export default function Header() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const displayName = username || userEmail || "";
   const isLoggedIn = !!userId;
@@ -102,6 +114,7 @@ export default function Header() {
         setUserId(null);
         setUserEmail(null);
         setUsername(null);
+        setAvatarUrl(null);
         return;
       }
 
@@ -110,12 +123,17 @@ export default function Header() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("username")
+        .select("username, avatar_url")
         .eq("id", sessionUser.id)
         .maybeSingle();
 
-      if (!error) setUsername(profile?.username ?? null);
-      else setUsername(null);
+      if (!error) {
+        setUsername(profile?.username ?? null);
+        setAvatarUrl(profile?.avatar_url ?? null);
+      } else {
+        setUsername(null);
+        setAvatarUrl(null);
+      }
     } finally {
       setAuthLoading(false);
       firstLoadRef.current = false;
@@ -130,6 +148,7 @@ export default function Header() {
       setUserId(u?.id ?? null);
       setUserEmail(u?.email ?? null);
       setUsername(null);
+      setAvatarUrl(null);
       setAuthLoading(false);
       fetchAuthAndProfile();
     });
@@ -142,6 +161,7 @@ export default function Header() {
     setUserId(null);
     setUserEmail(null);
     setUsername(null);
+    setAvatarUrl(null);
     setIsMobileMenuOpen(false);
 
     await supabase.auth.signOut();
@@ -161,7 +181,7 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // ✅ Click outside: CLOSE dropdown AND BLUR input (removes big caret line)
+  // Click outside: CLOSE dropdown AND BLUR input
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
@@ -172,7 +192,6 @@ export default function Header() {
 
       if (!clickedSearch) {
         setOpenSearch(false);
-        // blur only if search input is focused
         if (document.activeElement === searchInputRef.current) {
           searchInputRef.current?.blur();
         }
@@ -233,11 +252,11 @@ export default function Header() {
       router.push(`/games?search=${encodeURIComponent(search)}`);
       setOpenSearch(false);
       setIsMobileMenuOpen(false);
-      searchInputRef.current?.blur(); // ✅ hide caret after navigating
+      searchInputRef.current?.blur();
     }
     if (e.key === "Escape") {
       setOpenSearch(false);
-      searchInputRef.current?.blur(); // ✅ hide caret
+      searchInputRef.current?.blur();
     }
   };
 
@@ -250,7 +269,6 @@ export default function Header() {
         transition-transform duration-300 text-white
         ${hidden ? "-translate-y-full" : "translate-y-0"}
       `}
-      // ✅ prevents accidental text selection when clicking header gaps
       onMouseDown={(e) => {
         const el = e.target as HTMLElement;
         if (el.closest("input, textarea, select, button, a, [role='button']"))
@@ -346,7 +364,7 @@ export default function Header() {
                       href={`/games/${g.id}`}
                       onClick={() => {
                         setOpenSearch(false);
-                        searchInputRef.current?.blur(); // ✅ hide caret
+                        searchInputRef.current?.blur();
                       }}
                       className={`${noCaret} group flex items-center gap-3 px-3 py-3 hover:bg-white/5 transition border-b border-white/5 last:border-0`}
                     >
@@ -408,7 +426,7 @@ export default function Header() {
               <Link href="/profile" className={`${noCaret} group`}>
                 <div className="flex items-center gap-3 px-3 py-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur hover:bg-white/10 transition">
                   <div className="relative">
-                    <AvatarCircle label={displayName} />
+                    <AvatarCircle label={displayName} src={avatarUrl} />
                     <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border border-black bg-green-400" />
                   </div>
                   <div className="min-w-0">
@@ -535,7 +553,7 @@ export default function Header() {
                 ) : (
                   <>
                     <div className="flex items-center gap-3 px-2 py-2">
-                      <AvatarCircle label={displayName} />
+                      <AvatarCircle label={displayName} src={avatarUrl} />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-white/90 truncate">
                           {username || "User"}
@@ -552,6 +570,7 @@ export default function Header() {
 
                     <Button
                       asChild
+                      type="button"   
                       variant="ghost"
                       className="h-11 rounded-2xl justify-start text-white hover:bg-white/10"
                     >

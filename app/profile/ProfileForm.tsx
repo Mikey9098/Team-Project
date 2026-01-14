@@ -101,6 +101,29 @@ export default function ProfileForm({
 
   const ok = msg === "Saved";
 
+  // Helper: ensure profile row exists (prevents NOT NULL username failures)
+  const ensureProfileExists = async () => {
+    const cleanUsername =
+      (username?.trim() || initialUsername?.trim() || email.split("@")[0])
+        .replace(/\s+/g, "")
+        .slice(0, 24);
+
+    // If username is still too short, pad a bit (last resort)
+    const safeUsername =
+      cleanUsername.length >= 3
+        ? cleanUsername
+        : `${cleanUsername || "user"}${String(userId).slice(0, 4)}`;
+
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(
+        { id: userId, username: safeUsername },
+        { onConflict: "id", ignoreDuplicates: false }
+      );
+
+    if (error) throw error;
+  };
+
   const save = async () => {
     setMsg(null);
 
@@ -146,6 +169,9 @@ export default function ProfileForm({
 
     setAvatarBusy(true);
     try {
+      // ✅ Make sure a profile row exists so NOT NULL username is never violated
+      await ensureProfileExists();
+
       const ext = file.name.split(".").pop() || "png";
       const path = `${userId}/${Date.now()}.${ext}`;
 
@@ -162,9 +188,11 @@ export default function ProfileForm({
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = data.publicUrl;
 
+      // ✅ FIX: use UPDATE (not upsert) so it never tries inserting with username=NULL
       const { error: profErr } = await supabase
         .from("profiles")
-        .upsert({ id: userId, avatar_url: publicUrl }, { onConflict: "id" });
+        .update({ avatar_url: publicUrl })
+        .eq("id", userId);
 
       if (profErr) throw profErr;
 
@@ -181,9 +209,14 @@ export default function ProfileForm({
     setAvatarMsg(null);
     setAvatarBusy(true);
     try {
+      // ✅ Also ensure row exists (optional but safe)
+      await ensureProfileExists();
+
+      // ✅ FIX: update instead of upsert
       const { error } = await supabase
         .from("profiles")
-        .upsert({ id: userId, avatar_url: null }, { onConflict: "id" });
+        .update({ avatar_url: null })
+        .eq("id", userId);
 
       if (error) throw error;
 
@@ -312,8 +345,6 @@ export default function ProfileForm({
           </div>
         </div>
 
-        {/* Divider */}
-
         {/* Main grid */}
         <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
           {/* Left: edit */}
@@ -405,17 +436,6 @@ export default function ProfileForm({
                   </div>
                 </div>
               </Link>
-
-              {/* <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="font-semibold text-white/90">Avatar</p>
-                <p className="text-sm text-white/55">
-                  Uploads to Supabase Storage bucket:{" "}
-                  <span className="text-white/80 font-semibold">avatars</span>.
-                </p>
-                <p className="mt-2 text-xs text-white/40">
-                  Tip: keep bucket public for easiest setup.
-                </p>
-              </div> */}
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <p className="font-semibold text-white/90">Security</p>
