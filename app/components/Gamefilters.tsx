@@ -122,18 +122,6 @@ export default function GameFilters({
         ))}
       </Section>
 
-      {/* PLATFORMS */}
-      <Section id="platforms" title="PLATFORMS">
-        {["PC", "PlayStation", "Xbox"].map((p) => (
-          <button
-            key={p}
-            className="w-full text-left px-3 py-2 rounded-sm text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition"
-          >
-            {p}
-          </button>
-        ))}
-      </Section>
-
       {/* YEAR */}
       <Section id="year" title="RELEASE YEAR">
         {["all", "2026", "2025", "2024", "2023", "2022"].map((y) => (
