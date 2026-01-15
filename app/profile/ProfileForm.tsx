@@ -6,6 +6,8 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
 import {
   Loader2,
   Save,
@@ -90,7 +92,6 @@ export default function ProfileForm({
 
   const [username, setUsername] = useState(initialUsername);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -99,16 +100,16 @@ export default function ProfileForm({
   const displayName = username?.trim() || email;
   const letter = getLetter(displayName);
 
-  const ok = msg === "Saved";
-
   // Helper: ensure profile row exists (prevents NOT NULL username failures)
   const ensureProfileExists = async () => {
-    const cleanUsername =
-      (username?.trim() || initialUsername?.trim() || email.split("@")[0])
-        .replace(/\s+/g, "")
-        .slice(0, 24);
+    const cleanUsername = (
+      username?.trim() ||
+      initialUsername?.trim() ||
+      email.split("@")[0]
+    )
+      .replace(/\s+/g, "")
+      .slice(0, 24);
 
-    // If username is still too short, pad a bit (last resort)
     const safeUsername =
       cleanUsername.length >= 3
         ? cleanUsername
@@ -124,14 +125,18 @@ export default function ProfileForm({
     if (error) throw error;
   };
 
-  const save = async () => {
-    setMsg(null);
-
+  // ✅ FIXED: sonner-only feedback (no inline "Saved" text)
+  const save = async (): Promise<boolean> => {
     const clean = username.trim();
-    if (clean.length < 3)
-      return setMsg("Username must be at least 3 characters.");
-    if (clean.length > 24)
-      return setMsg("Username must be under 24 characters.");
+
+    if (clean.length < 3) {
+      toast.error("Username must be at least 3 characters");
+      return false;
+    }
+    if (clean.length > 24) {
+      toast.error("Username must be under 24 characters");
+      return false;
+    }
 
     setSaving(true);
     try {
@@ -140,9 +145,12 @@ export default function ProfileForm({
         .upsert({ id: userId, username: clean }, { onConflict: "id" });
 
       if (error) throw error;
-      setMsg("Saved");
+
+      toast.success("Profile updated ✅");
+      return true;
     } catch (e: any) {
-      setMsg(e?.message ?? "Failed to save");
+      toast.error(e?.message ?? "Failed to save profile");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -159,17 +167,16 @@ export default function ProfileForm({
     setAvatarMsg(null);
 
     if (!file.type.startsWith("image/")) {
-      setAvatarMsg("Please select an image file.");
+      toast.error("Please select an image file");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      setAvatarMsg("Max file size is 2MB.");
+      toast.error("Max file size is 2MB");
       return;
     }
 
     setAvatarBusy(true);
     try {
-      // ✅ Make sure a profile row exists so NOT NULL username is never violated
       await ensureProfileExists();
 
       const ext = file.name.split(".").pop() || "png";
@@ -188,7 +195,6 @@ export default function ProfileForm({
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = data.publicUrl;
 
-      // ✅ FIX: use UPDATE (not upsert) so it never tries inserting with username=NULL
       const { error: profErr } = await supabase
         .from("profiles")
         .update({ avatar_url: publicUrl })
@@ -198,8 +204,11 @@ export default function ProfileForm({
 
       setAvatarUrl(publicUrl);
       setAvatarMsg("Avatar uploaded ✅");
+      toast.success("Avatar updated ✅");
     } catch (e: any) {
-      setAvatarMsg(e?.message ?? "Upload failed");
+      const message = e?.message ?? "Upload failed";
+      setAvatarMsg(message);
+      toast.error(message);
     } finally {
       setAvatarBusy(false);
     }
@@ -209,10 +218,8 @@ export default function ProfileForm({
     setAvatarMsg(null);
     setAvatarBusy(true);
     try {
-      // ✅ Also ensure row exists (optional but safe)
       await ensureProfileExists();
 
-      // ✅ FIX: update instead of upsert
       const { error } = await supabase
         .from("profiles")
         .update({ avatar_url: null })
@@ -221,9 +228,12 @@ export default function ProfileForm({
       if (error) throw error;
 
       setAvatarUrl(null);
-      setAvatarMsg("Avatar removed.");
+      setAvatarMsg(null);
+      toast.success("Avatar removed");
     } catch (e: any) {
-      setAvatarMsg(e?.message ?? "Failed to remove avatar");
+      const message = e?.message ?? "Failed to remove avatar";
+      setAvatarMsg(message);
+      toast.error(message);
     } finally {
       setAvatarBusy(false);
     }
@@ -284,7 +294,7 @@ export default function ProfileForm({
                   type="button"
                   onClick={pickAvatar}
                   disabled={avatarBusy}
-                  className="h-9 rounded-xl bg-primary text-black hover:bg-primary/90"
+                  className="h-9 rounded-xl bg-primary text-black hover:bg-primary/90 disabled:opacity-60"
                 >
                   {avatarBusy ? (
                     <span className="flex items-center gap-2">
@@ -305,7 +315,7 @@ export default function ProfileForm({
                     variant="ghost"
                     onClick={removeAvatar}
                     disabled={avatarBusy}
-                    className="h-9 rounded-xl text-white hover:bg-white/10 border border-white/10"
+                    className="h-9 rounded-xl text-white hover:bg-white/10 border border-white/10 hover:text-red-700"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Remove
@@ -370,23 +380,11 @@ export default function ProfileForm({
               </p>
             </div>
 
-            {msg && (
-              <div
-                className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
-                  ok
-                    ? "border-green-500/25 bg-green-500/10 text-green-100"
-                    : "border-red-500/25 bg-red-500/10 text-red-100"
-                }`}
-              >
-                {ok ? "Saved ✅" : msg}
-              </div>
-            )}
-
             <div className="mt-6 flex flex-wrap gap-3">
               <Button
-                onClick={save}
                 disabled={saving}
-                className="h-11 rounded-xl bg-primary text-black hover:bg-primary/90"
+                onClick={save}
+                className="h-11 rounded-xl bg-primary text-black hover:bg-primary/90 disabled:opacity-60"
               >
                 {saving ? (
                   <span className="flex items-center gap-2">

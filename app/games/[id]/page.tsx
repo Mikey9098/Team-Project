@@ -242,7 +242,7 @@ export default async function GamePage({
               <h2 className="text-xl md:text-2xl font-bold tracking-tight">
                 About
               </h2>
-              <div className="mt-4 prose prose-invert prose-zinc max-w-none text-zinc-300 leading-relaxed whitespace-pre-line">
+              <div className="mt-4 prose prose-invert prose-zinc prose-sm sm:prose-base max-w-none text-zinc-300 leading-relaxed whitespace-pre-line line-clamp-6 sm:line-clamp-none">
                 {game.description_raw || "No description available."}
               </div>
             </div>
