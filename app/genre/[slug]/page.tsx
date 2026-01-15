@@ -69,7 +69,7 @@ export default async function GenrePage({ params }: Props) {
   const games = await getGamesByGenre(slug);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
       {/* Offset for your fixed header (change 72px if your header height differs) */}
       <div className="pt-18" />
 
