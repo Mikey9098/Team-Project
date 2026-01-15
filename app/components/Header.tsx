@@ -181,14 +181,20 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Click outside: CLOSE dropdown AND BLUR input
+  // ✅ Click outside: CLOSE dropdown AND BLUR input (FIXED mobile button logic)
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
 
       const clickedSearch =
         searchContainerRef.current?.contains(target) ?? false;
-      const clickedMobile = mobileMenuRef.current?.contains(target) ?? false;
+
+      const clickedMobilePanel =
+        mobileMenuRef.current?.contains(target) ?? false;
+      const clickedMobileButton =
+        target.closest("[data-mobile-menu-button]") !== null;
+      const clickedMobile = clickedMobilePanel || clickedMobileButton;
 
       if (!clickedSearch) {
         setOpenSearch(false);
@@ -457,6 +463,7 @@ export default function Header() {
           variant="ghost"
           size="icon"
           onClick={() => setIsMobileMenuOpen((v) => !v)}
+          data-mobile-menu-button="true"
           className="md:hidden h-11 w-11 rounded-2xl text-white hover:bg-white/10"
         >
           {isMobileMenuOpen ? <X /> : <Menu />}
@@ -570,7 +577,7 @@ export default function Header() {
 
                     <Button
                       asChild
-                      type="button"   
+                      type="button"
                       variant="ghost"
                       className="h-11 rounded-2xl justify-start text-white hover:bg-white/10"
                     >

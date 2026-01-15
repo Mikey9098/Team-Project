@@ -55,13 +55,13 @@ function Chip({ children }: { children: React.ReactNode }) {
 
 function LoadingGrid() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10">
       {Array.from({ length: 9 }).map((_, i) => (
         <div
           key={i}
           className="rounded-3xl overflow-hidden border border-white/10 bg-white/5"
         >
-          <div className="relative h-[260px]">
+          <div className="relative h-[220px] sm:h-[260px]">
             <Skeleton className="h-full w-full bg-zinc-800" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
           </div>
@@ -111,7 +111,7 @@ export const GameCard = ({
       "
     >
       {/* IMAGE */}
-      <div className="relative h-[280px] w-full overflow-hidden">
+      <div className="relative h-[220px] sm:h-[260px] lg:h-[280px] w-full overflow-hidden">
         <Image
           fill
           src={game.background_image || "/placeholder.jpg"}
@@ -123,10 +123,10 @@ export const GameCard = ({
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
 
         {/* TOP BAR (always aligned) */}
-        <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-3">
+        <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-black/60 px-4 text-xs font-semibold text-white/85 backdrop-blur">
-              <Calendar className="h-4 w-4 text-white/70 shrink-0" />
+            <span className="inline-flex h-9 sm:h-10 items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 sm:px-4 text-xs font-semibold text-white/85 backdrop-blur">
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white/70 shrink-0" />
               <span className="truncate">{releaseLabel}</span>
             </span>
 
@@ -147,7 +147,7 @@ export const GameCard = ({
             }}
             disabled={favLoading}
             className={`
-              h-10 w-10 rounded-full grid place-items-center
+              h-9 w-9 sm:h-10 sm:w-10 rounded-full grid place-items-center
               border border-white/10 bg-black/60 backdrop-blur
               transition hover:scale-105 active:scale-95
               ${isFavorited ? "text-primary" : "text-white"}
@@ -166,15 +166,15 @@ export const GameCard = ({
       </div>
 
       {/* CONTENT (fixed height -> bottoms even) */}
-      <div className="p-7 flex flex-col h-40 mb-10">
+      <div className="p-5 sm:p-6 lg:p-7 flex flex-col min-h-[140px] sm:h-40 mb-6 sm:mb-10">
         {/* TITLE — fixed height, never overlaps */}
         <h3
           className="
-      text-lg md:text-xl font-extrabold text-white/95
+      text-base sm:text-lg md:text-xl font-extrabold text-white/95
       group-hover:text-primary transition
       leading-snug
       line-clamp-2
-      min-h-[3.2rem]   /* 👈 reserves space for 2 lines */
+      min-h-[2.6rem] sm:min-h-[3.2rem]   /* 👈 reserves space for 2 lines */
     "
         >
           {game.name}
@@ -188,14 +188,14 @@ export const GameCard = ({
         </div>
 
         {/* FOOTER — pinned */}
-        <div className="mt-auto pt-4 flex items-center justify-between">
+        <div className="mt-auto pt-3 sm:pt-4 flex items-center justify-between">
           <span className="text-sm text-white/55">
             Released:{" "}
             <span className="text-white/80">{game.released || "TBA"}</span>
           </span>
 
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-white/85">
-            <Star className="h-4 w-4 text-yellow-300" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-white/85">
+            <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-300" />
             {ratingLabel}
           </span>
         </div>
@@ -379,15 +379,15 @@ export default function GamesPage() {
         <div className="pt-[72px]" />
 
         {/* ✅ wider container -> bigger cards */}
-        <div className="mx-auto max-w-screen-2xl px-4 md:px-10 py-10">
+        <div className="mx-auto max-w-screen-2xl px-4 md:px-10 py-8 md:py-10">
           {/* header */}
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-7">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5 md:mb-7">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
                 Browse the catalog
               </div>
-              <h1 className="mt-3 text-3xl md:text-4xl font-black tracking-tight">
+              <h1 className="mt-3 text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
                 Browse Games
               </h1>
               <p className="mt-2 text-sm text-white/55 max-w-2xl">
@@ -397,7 +397,7 @@ export default function GamesPage() {
 
             <Link
               href="/favorites"
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition w-fit"
+              className="inline-flex w-full sm:w-fit items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition"
             >
               View Favorites
               <ArrowRight className="h-4 w-4" />
@@ -410,7 +410,7 @@ export default function GamesPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10">
             <GameFilters
               sort={sort}
               genre={genre}
@@ -423,7 +423,7 @@ export default function GamesPage() {
               {/* toolbar */}
               <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-white/70">
                     <span className="font-semibold text-white/90">
                       {loading ? "Loading…" : `${games.length} games`}
                     </span>
@@ -435,7 +435,7 @@ export default function GamesPage() {
                   {activeFilters && (
                     <button
                       onClick={clearFilters}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition w-fit"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition w-full sm:w-fit"
                     >
                       <X className="h-4 w-4" />
                       Clear filters
@@ -451,7 +451,7 @@ export default function GamesPage() {
                 <AnimatePresence mode="popLayout">
                   <motion.div
                     layout
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10"
                   >
                     {games.map((game) => (
                       <motion.div
