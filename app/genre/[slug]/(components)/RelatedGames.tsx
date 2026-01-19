@@ -85,7 +85,7 @@ const GameCard = ({ game }: { game: Game }) => {
 
 export const RelatedGames = ({ games }: { games: Game[] }) => {
   return (
-    <section className="relative bg-black">
+    <section className="relative bg-black overflow-hidden">
       {/* background glows */}
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
